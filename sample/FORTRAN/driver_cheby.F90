@@ -66,7 +66,7 @@
 
       if (proc_id.eq.0) then
 	print *,'P3DFFT test, Chebyshev'
-         open (unit=3,file='stdin',status='old',  &
+         open (unit=3,file='/dev/stdin',status='old',  &
               access='sequential',form='formatted', iostat=fstatus)
          if (fstatus .eq. 0) then
             write(*, *) ' Reading from input file stdin'
@@ -231,9 +231,8 @@
         timer = timer + MPI_Wtime()
 
         if(proc_id .eq. 0) then
-           print *,'After cheby transform'
+           print *,'After cheby transform x'
         endif
-        call print_buf(cmem,fsize(1),fsize(2),fsize(3))
 
 #ifdef STRIDE1
 
@@ -252,7 +251,8 @@
         enddo
 #endif
         cmem = cmem * 0.5d0
-
+        call print_buf(cmem,fsize(1),fsize(2),fsize(3))
+        
       	call p3dfft_btran_c2r(cmem, rmem,'cff')
 
       	maxdelta1=0.d0
