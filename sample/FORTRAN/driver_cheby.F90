@@ -66,7 +66,7 @@
 
       if (proc_id.eq.0) then
 	print *,'P3DFFT test, Chebyshev'
-         open (unit=3,file='/dev/stdin',status='old',  &
+         open (unit=3,file='stdin',status='old',  &
               access='sequential',form='formatted', iostat=fstatus)
          if (fstatus .eq. 0) then
             write(*, *) ' Reading from input file stdin'
@@ -222,6 +222,7 @@
            rmem(:,:,k) = sin(coordZ(k))
 #endif
         enddo
+        Print *, rmem(1,1,:)
 
          call MPI_Barrier(MPI_COMM_WORLD,ierr)
         timer = timer - MPI_Wtime()

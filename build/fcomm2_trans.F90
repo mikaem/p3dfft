@@ -527,7 +527,7 @@
 
          call unpack_fcomm2_trans(dest,buf2,buf3,1,1,op)
 
-      t = MPI_Wtime() + t
+      tc = MPI_Wtime() + tc
       endif
 
       return

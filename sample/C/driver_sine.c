@@ -51,6 +51,8 @@ int main(int argc,char **argv)
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
+   double tt[100];
+   double rfast, ravg;
 
 #ifndef SINGLE_PREC
    void print_all(double *,long int,int,long int),mult_array(double *,long int,double);
@@ -192,27 +194,40 @@ int main(int argc,char **argv)
      if(proc_id == 0)
         printf("Iteration %d\n",m);
      MPI_Barrier(MPI_COMM_WORLD);
-     rtime1 = rtime1 - MPI_Wtime();
+     rtime1 = MPI_Wtime();
      /* compute forward Fourier transform on A, store results in B */
      Cp3dfft_ftran_r2c(A,B,op_f);
-     rtime1 = rtime1 + MPI_Wtime();
+     rtime1 = MPI_Wtime() - rtime1;
 
      if(proc_id == 0)
         printf("Result of forward transform\n");
 
      print_all(B,Ntot,proc_id,Nglob);
-     /* normalize */
-     mult_array(B,Ntot,factor);
 
      /* Compute backward transform on B, store results in C */
      MPI_Barrier(MPI_COMM_WORLD);
-     rtime1 = rtime1 - MPI_Wtime();
+     rtime2 = MPI_Wtime();
+     /* normalize */
+     mult_array(B,Ntot,factor);
+
      Cp3dfft_btran_c2r(B,C,op_b);
-     rtime1 = rtime1 + MPI_Wtime();
+     rtime2 = MPI_Wtime()-rtime2;
+
+     tt[m] = rtime1 + rtime2;
 
    }
    /* free work space */
   Cp3dfft_clean();
+
+  MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+
+  rfast = 1e8;
+  ravg = 0.;
+  for(m=0;m < n;m++) {
+      rfast = (tt[m] < rfast) ? tt[m] : rfast;
+      ravg += tt[m];
+  }
+  ravg /= (double) n;
 
   /* Check results */
   cdiff = 0.0; p = C;
@@ -251,7 +266,7 @@ int main(int argc,char **argv)
 
 
   /* Gather timing statistics */
-  MPI_Reduce(&rtime1,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+//   MPI_Reduce(&rtime1,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
   for (i=0;i < 12;i++) {
     timers[i] = timers[i] / ((double) n);
@@ -270,12 +285,12 @@ int main(int argc,char **argv)
   }
 
   if(proc_id == 0) {
-     printf("Time per loop=%lg\n",rtime2/((double) n));
+     printf("Average=%lg\n",ravg);
+     printf("Fastest=%lg\n",rfast);
      for(i=0;i < 12;i++) {
        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
      }
   }
-
 
   MPI_Finalize();
 

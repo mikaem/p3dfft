@@ -76,7 +76,7 @@ int main(int argc,char **argv)
    long int Ntot,Nglob;
    double pi,twopi,sinyz,cdiff,ccdiff,ans,prec;
    double *sinx,*siny,*sinz,factor,r;
-   double rtime1,rtime2,gt[12],gt1[12],gt2[12],timers[12];
+   double rtime1,rtime2,rfast,rfast2,ravg,gt[12],gt1[12],gt2[12],timers[12];
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
@@ -203,6 +203,7 @@ int main(int argc,char **argv)
    factor = 1.0/Nglob;
 
    rtime1 = 0.0;
+   rfast = 1e8;
    for(m=0;m < n;m++) {
 
      if(proc_id == 0)
@@ -210,9 +211,9 @@ int main(int argc,char **argv)
 
      MPI_Barrier(MPI_COMM_WORLD);
      /* Forward transform */
-     rtime1 = rtime1 - MPI_Wtime();
+     rtime1 = MPI_Wtime();
      Cp3dfft_ftran_r2c(A,B,op_f);
-     rtime1 = rtime1 + MPI_Wtime();
+//      rtime1 = rtime1 + MPI_Wtime();
 
      /*
      if(proc_id == 0)
@@ -223,11 +224,13 @@ int main(int argc,char **argv)
 /* normalize */
      mult_array(B,Ntot,factor);
 
-     MPI_Barrier(MPI_COMM_WORLD);
      /* Backward transform */
-     rtime1 = rtime1 - MPI_Wtime();
+//      rtime1 = rtime1 - MPI_Wtime();
      Cp3dfft_btran_c2r(B,C,op_b);
-     rtime1 = rtime1 + MPI_Wtime();
+     MPI_Barrier(MPI_COMM_WORLD);
+     rtime1 = MPI_Wtime() - rtime1;
+     rfast = (rtime1 < rfast) ? rtime1 : rfast;
+     ravg += rtime1;
 
    }
    /* Free work space */
@@ -267,7 +270,8 @@ int main(int argc,char **argv)
 
 
   /* Gather timing statistics */
-  MPI_Reduce(&rtime1,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+  MPI_Reduce(&ravg,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+  MPI_Reduce(&rfast,&rfast2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
   for (i=0;i < 12;i++) {
     timers[i] = timers[i] / ((double) n);
@@ -282,13 +286,12 @@ int main(int argc,char **argv)
   }
 
   if(proc_id == 0) {
-     printf("Time per loop=%lg\n",rtime2/((double) n));
+     printf("Average=%lg\n",rtime2/((double) n));
+     printf("Fastest=%lg\n",rfast);
      for(i=0;i < 12;i++) {
        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
      }
   }
-
-
 
   MPI_Finalize();
 

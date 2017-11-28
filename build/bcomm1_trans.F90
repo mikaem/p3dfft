@@ -398,13 +398,11 @@
 #else
 ! Use MPI_Alltoallv
 
-      t = t + MPI_Wtime()
-      tc = tc - MPI_Wtime()
-
       call mpi_alltoallv(buf1,JrSndCnts, JrSndStrt,mpi_byte, buf2,JrRcvCnts, JrRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
 
       t = t + MPI_Wtime()
+
       tc = tc - MPI_Wtime()
 
       call unpack_bcomm1_trans(dest,buf2)

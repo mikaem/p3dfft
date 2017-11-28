@@ -196,7 +196,7 @@
       Nglob = nx * ny
       Nglob = Nglob * nz
       factor = 1.0d0/Nglob
-
+      
       rtime1 = 0.0
 !
 ! Repeat n times

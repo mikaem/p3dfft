@@ -352,6 +352,7 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
       integer x,y,z,i,k,nx,ny,nz,ierr,dnz,dny
       integer(i8) Nl
       character(len=3) op
+      real(r8) dummytimers(2)
 
       if(.not. mpi_set) then
          print *,'P3DFFT error: call setup before other routines'
@@ -372,22 +373,24 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 
       if(jproc .gt. 1) then
 
+         timers(3) = MPI_Wtime()
+
 #ifdef STRIDE1
          call init_b_c(XYZg, 1,nz, buf, 1, nz,nz,jjsize)
-         call bcomm1_trans(XYZg,buf,op,timers(3),timers(9))
+         call bcomm1_trans(XYZg,buf,op,dummytimers(1),dummytimers(2))
 #else
+         timers(3) = MPI_Wtime() - timers(3)
 
          if(OW .and. nz .eq. nzc) then
 
+            timers(9) = MPI_Wtime()
             if(iisize*jjsize .gt. 0) then
 		if(op(1:1) == 't' .or. op(1:1) == 'f') then
                    call init_b_c(XYZg, iisize*jjsize, 1, &
                                  XYZg, iisize*jjsize, 1,nz,iisize*jjsize)
 
-                   timers(9) = timers(9) - MPI_Wtime()
                    call exec_b_c2_same(XYZg, iisize*jjsize,1, XYZg, &
 				iisize*jjsize, 1,nz,iisize*jjsize)
-                   timers(9) = timers(9) + MPI_Wtime()
  		else if(op(1:1) == 'c') then
 	           call init_ctrans_r2 (XYZg, 2*iisize*jjsize, 1, &
 					XYZg, 2*iisize*jjsize, 1, &
@@ -407,14 +410,23 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)
 		endif
             endif
-            call bcomm1(XYZg,buf,timers(3),timers(9))
+
+            timers(9) = MPI_Wtime()-timers(9)
+
+            timers(3) = MPI_Wtime()
+            call bcomm1(XYZg,buf,dummytimers(1),dummytimers(2))
+            timers(3) = MPI_Wtime() - timers(3)
 
          else
 
            if(iisize*jjsize .gt. 0) then
               if(op(1:1) == 'n' .or. op(1:1) == '0') then
-                  call bcomm1(XYZg,buf,timers(3),timers(9))
+                  timers(3) = MPI_Wtime()
+                  call bcomm1(XYZg,buf,dummytimers(1),dummytimers(2))
+                  timers(3) = MPI_Wtime() - timers(3)
 	      else
+
+	        timers(9) = MPI_Wtime()
 
 	        dnz = nz - nzc
 		call seg_copy_z(XYZg,buf,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
@@ -448,7 +460,12 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)
 		 endif
 
-                 call bcomm1(buf,buf,timers(3),timers(9))
+		 timers(9) = MPI_Wtime() - timers(9)
+
+		 timers(3) = MPI_Wtime()
+                 call bcomm1(buf,buf,dummytimers(1),dummytimers(2))
+                 timers(3) = MPI_Wtime() - timers(3)
+
               endif
 
             endif
@@ -459,7 +476,7 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 
       else
 
-            timers(9) = timers(9) - MPI_Wtime()
+         timers(9) = MPI_Wtime()
 
 #ifdef STRIDE1
          call reorder_trans_b1(XYZg,buf,buf2,op)
@@ -532,7 +549,7 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
          endif
 #endif
 
-            timers(9) = timers(9) + MPI_Wtime()
+         timers(9) = MPI_Wtime() - timers(9)
 
       endif
 
@@ -543,28 +560,26 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 !
 
 
+
       if(iisize * kjsize .gt. 0) then
+         timers(10) = MPI_Wtime()
 
 #ifdef STRIDE1
          call init_b_c(buf,1,ny,buf,1,ny,ny,iisize*kjsize)
 
-         timers(10) = timers(10) - MPI_Wtime()
-
          call exec_b_c1(buf,1,ny,buf,1,ny,ny,iisize*kjsize)
-
-         timers(10) = timers(10) + MPI_Wtime()
 
 #else
          call init_b_c(buf,iisize,1,buf,iisize,1,ny,iisize)
 
-         timers(10) = timers(10) - MPI_Wtime()
          do z=kjstart,kjend
 
             call btran_y_zplane(buf,z-kjstart,iisize,kjsize,iisize,1, &
                                 buf,z-kjstart,iisize,kjsize,iisize,1,ny,iisize)
 
          enddo
-         timers(10) = timers(10) + MPI_Wtime()
+         timers(10) = MPI_Wtime() - timers(10)
+
 #endif
       endif
 
@@ -587,30 +602,26 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
       endif
 #else
       if(iproc .gt. 1) then
-         call bcomm2(buf,buf,timers(4),timers(11))
+         timers(4) = MPI_Wtime()
+         call bcomm2(buf,buf,dummytimers(1),dummytimers(2))
+         timers(4) = MPI_Wtime() - timers(4)
 ! Perform Complex-to-real FFT in x dimension for all y and z
          if(jisize * kjsize .gt. 0) then
-
+            timers(12) = MPI_Wtime()
             call init_b_c2r(buf,nxhp,XgYZ,nx,nx,jisize*kjsize)
-
-            timers(12) = timers(12) - MPI_Wtime()
-
             call exec_b_c2r(buf,nxhp,XgYZ,nx,nx,jisize*kjsize)
-            timers(12) = timers(12) + MPI_Wtime()
+            timers(12) =  MPI_Wtime() - timers(12)
          endif
       else
 ! Perform Complex-to-real FFT in x dimension for all y and z
          if(jisize * kjsize .gt. 0) then
+            timers(12) = MPI_Wtime()
 
 	    call seg_copy_x(buf,buf1,1,nxhpc,0,nxhpc,nxhp,jisize,kjsize)
 	    call seg_zero_x(buf1,nxhpc+1,nxhp,nxhp,jisize,kjsize)
-
             call init_b_c2r(buf1,nxhp,XgYZ,nx,nx,jisize*kjsize)
-
-            timers(12) = timers(12) - MPI_Wtime()
-
             call exec_b_c2r(buf1,nxhp,XgYZ,nx,nx,jisize*kjsize)
-            timers(12) = timers(12) + MPI_Wtime()
+            timers(12) = MPI_Wtime() - timers(12)
          endif
        endif
 
