@@ -74,7 +74,7 @@ int main(int argc,char **argv)
    long int Ntot,Nglob;
    double pi,twopi,sinyz,cdiff,ccdiff,ans,prec;
    double *sinx,*siny,*sinz,factor;
-   double rtime1,rtime2,gt[12],gt1[12],gt2[12],timers[12];
+   double rfast,rfast2,ravg,rtime1,rtime2,gt[12],gt1[12],gt2[12],timers[12];
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
@@ -202,29 +202,32 @@ int main(int argc,char **argv)
    factor = 1.0/Nglob;
 
    rtime1 = 0.0;
+   rfast = 1e8;
    for(m=0;m < n;m++) {
 
      if(proc_id == 0)
         printf("Iteration %d\n",m);
 
      MPI_Barrier(MPI_COMM_WORLD);
-     rtime1 = rtime1 - MPI_Wtime();
+     rtime1 = MPI_Wtime();
      /* Forward transform in-place */
      Cp3dfft_ftran_r2c(A,A,op_f);
-     rtime1 = rtime1 + MPI_Wtime();
+     //rtime1 = rtime1 + MPI_Wtime();
 
-     if(proc_id == 0)
-        printf("Result of forward transform\n");
+     //if(proc_id == 0)
+     //   printf("Result of forward transform\n");
 
-     print_all(A,Ntot,proc_id,Nglob);
+     //print_all(A,Ntot,proc_id,Nglob);
      /* normallize */
      mult_array(A,Ntot,factor);
 
-     MPI_Barrier(MPI_COMM_WORLD);
-     rtime1 = rtime1 - MPI_Wtime();
+     //MPI_Barrier(MPI_COMM_WORLD);
+     //rtime1 = rtime1 - MPI_Wtime();
      /* Backward transform in-place */
      Cp3dfft_btran_c2r(A,A,op_b);
-     rtime1 = rtime1 + MPI_Wtime();
+     rtime1 = MPI_Wtime()-rtime1;
+     rfast = ((rtime1 < rfast) ? rtime1 : rfast);
+     ravg = ravg + rtime1;
 
    }
 
@@ -267,8 +270,9 @@ int main(int argc,char **argv)
   }
 
   /* Gather timing statistics */
-  MPI_Reduce(&rtime1,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
-
+  MPI_Reduce(&rfast,&rfast2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+  MPI_Reduce(&ravg,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+  
   for (i=0;i < 12;i++) {
     timers[i] = timers[i] / ((double) n);
   }
@@ -282,7 +286,8 @@ int main(int argc,char **argv)
   }
 
   if(proc_id == 0) {
-     printf("Time per loop=%lg\n",rtime2/((double) n));
+     printf("Average=%lg\n",rtime2/((double) n));
+     printf("Fastest=%lg\n",rfast2);
      for(i=0;i < 12;i++) {
        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
      }

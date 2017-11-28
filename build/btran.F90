@@ -386,22 +386,22 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 
                    timers(9) = timers(9) - MPI_Wtime()
                    call exec_b_c2_same(XYZg, iisize*jjsize,1, XYZg, &
-				iisize*jjsize, 1,nz,iisize*jjsize)
+		   		iisize*jjsize, 1,nz,iisize*jjsize)
                    timers(9) = timers(9) + MPI_Wtime()
  		else if(op(1:1) == 'c') then
 	           call init_ctrans_r2 (XYZg, 2*iisize*jjsize, 1, &
 					XYZg, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
                    call exec_ctrans_r2_same (XYZg, 2*iisize*jjsize, 1, &
- 					XYZg, 2*iisize*jjsize, 1, &
+ 		   			XYZg, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
  		else if(op(1:1) == 's') then
 	           call init_strans_r2 (XYZg, 2*iisize*jjsize, 1, &
 					XYZg, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
                    call exec_strans_r2_same (XYZg, 2*iisize*jjsize, 1, &
- 					XYZg, 2*iisize*jjsize, 1, &
-					nz, 2*iisize*jjsize)
+ 		   			XYZg, 2*iisize*jjsize, 1, &
+		   			nz, 2*iisize*jjsize)
 	        else if(op(1:1) /= 'n' .and. op(1:1) /= '0') then
 		   print *,taskid,'Unknown transform type: ',op(1:1)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)
@@ -434,15 +434,15 @@ subroutine ztran_b_same_many(A,str1,str2,n,m,dim,nv,op)
 					buf, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
                    call exec_ctrans_r2_same (buf, 2*iisize*jjsize, 1, &
- 					buf, 2*iisize*jjsize, 1, &
+ 		   			buf, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
 		 else if(op(1:1) == 's') then
 	           call init_strans_r2 (buf, 2*iisize*jjsize, 1, &
 					buf, 2*iisize*jjsize, 1, &
 					nz, 2*iisize*jjsize)
                    call exec_strans_r2_same (buf, 2*iisize*jjsize, 1, &
- 					buf, 2*iisize*jjsize, 1, &
-					nz, 2*iisize*jjsize)
+ 		   			buf, 2*iisize*jjsize, 1, &
+		   			nz, 2*iisize*jjsize)
 	         else if(op(1:1) /= 'n' .and. op(1:1) /= '0') then
 		   print *,taskid,'Unknown transform type: ',op(1:1)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)

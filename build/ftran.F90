@@ -660,7 +660,7 @@
               timers(8) = timers(8) + MPI_Wtime()
 
 	    else if(op(3:3) == 's') then
-               call init_strans_r2(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+              call init_strans_r2(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 
               timers(8) = timers(8) - MPI_Wtime()
               call exec_strans_r2_same(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
