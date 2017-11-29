@@ -457,7 +457,7 @@
 
       dny = ny_fft-nyc
 
-      tc = tc - MPI_Wtime()
+      t = MPI_Wtime()
 
 !$OMP PARALLEL DO private(i,pos0,position,x,y,z)
      do i=0,jproc-1
@@ -515,10 +515,6 @@
 
       enddo
 
-
-      tc = tc + MPI_Wtime()
-      t = t - MPI_Wtime()
-
 #ifdef USE_EVEN
       call mpi_alltoall(buf1,KfCntMax, mpi_byte, buf2,KfCntMax, mpi_byte,mpi_comm_col,ierr)
 #else
@@ -527,16 +523,14 @@
       call mpi_alltoallv(buf1,KfSndCnts, KfSndStrt,mpi_byte,buf2,KfRcvCnts, KfRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
 
-      t = MPI_Wtime() + t
-
      if(jjsize .gt. 0) then
 
-      tc = - MPI_Wtime() + tc
 
          call unpack_fcomm2_trans(dest,buf2,buf3,1,1,op)
 
-      t = MPI_Wtime() + t
       endif
+
+      t = MPI_Wtime() - t
 
       return
       end subroutine

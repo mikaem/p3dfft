@@ -52,6 +52,8 @@ int main(int argc,char **argv)
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
    double tt[100];
+   double rfast, ravg;
+
 #ifndef SINGLE_PREC
    void print_all(double *,long int,int,long int),mult_array(double *,long int,double);
 #else
@@ -210,8 +212,6 @@ int main(int argc,char **argv)
 
   MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
-  /* Check results */
-  cdiff = 0.0; p = C;
   for(z=0;z < isize[2];z++)
     for(y=0;y < isize[1];y++)  {
        sinyz =siny[y]*sinz[z];
@@ -281,7 +281,6 @@ int main(int argc,char **argv)
        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
      }
   }
-
 
   MPI_Finalize();
 

@@ -243,8 +243,9 @@
       t = t + MPI_Wtime()
 
 ! Unpack receive buffers into dest
-
+      tc = tc - MPI_Wtime()
       call unpack_bcomm1(dest,buf2)
+      tc = tc + MPI_Wtime()
 
       return
       end subroutine

@@ -204,8 +204,9 @@
 
 
 ! Pack send buffers for exchanging y and z for all x at once
-
+     tc = tc - MPI_Wtime()
      call pack_fcomm2(buf1,source)
+     tc = tc + MPI_Wtime()
 
 ! Exchange y-z buffers in columns of processors
 
