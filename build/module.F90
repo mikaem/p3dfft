@@ -272,12 +272,10 @@
       call dfftw_destroy_plan(plan2_bc_same(tid))
       call dfftw_destroy_plan(plan_ctrans_same(tid))
       call dfftw_destroy_plan(plan_strans_same(tid))
-#ifdef STRIDE1
       call dfftw_destroy_plan(plan_strans_dif(tid))
       call dfftw_destroy_plan(plan_ctrans_dif(tid))
       call dfftw_destroy_plan(plan2_fc_dif(tid))
       call dfftw_destroy_plan(plan2_bc_dif(tid))
-#endif
 #else
       call sfftw_destroy_plan(plan1_frc(tid))
       call sfftw_destroy_plan(plan1_bcr(tid))
@@ -287,19 +285,15 @@
       call sfftw_destroy_plan(plan2_bc_same(tid))
       call sfftw_destroy_plan(plan_ctrans_same(tid))
       call sfftw_destroy_plan(plan_strans_same(tid))
-#ifdef STRIDE1
       call sfftw_destroy_plan(plan2_fc_dif(tid))
       call sfftw_destroy_plan(plan2_bc_dif(tid))
       call sfftw_destroy_plan(plan_ctrans_dif(tid))
       call sfftw_destroy_plan(plan_strans_dif(tid))
 #endif
-#endif
       enddo
 
       deallocate(plan1_frc,plan1_bcr,plan1_fc,plan2_fc_same,plan1_bc,plan2_bc_same,plan_ctrans_same,plan_strans_same)
-#ifdef STRIDE1
       deallocate(plan_ctrans_dif,plan_strans_dif,plan2_fc_dif,plan2_bc_dif)
-#endif
 
 #elif defined ESSL
       deallocate(caux1)
@@ -311,6 +305,13 @@
       deallocate(buf1)
       deallocate(buf2)
       deallocate(buf)
+
+    deallocate( iiist, iiisz, iiien, ijst, ijsz, ijen, startx_frc, startx_bcr, &
+    startx_f_c1, startx_b_c1, startx_ctrans_same, startx_strans_same, startx_ctrans_dif,&
+    startx_strans_dif, startx_b_c2_same, startx_f_c2_same, startx_b_c2_dif,startx_f_c2_dif,&
+    starty_frc,starty_bcr,starty_f_c1,starty_b_c1,starty_ctrans_same,starty_strans_same,&
+    starty_ctrans_dif,starty_strans_dif,starty_b_c2_same,starty_f_c2_same,starty_b_c2_dif,&
+    starty_f_c2_dif) 
 
     deallocate (iist)
     deallocate (iisz)
@@ -1351,5 +1352,3 @@ end subroutine
 !      end subroutine p3dfft_rot_x180
 
       end module
-
-

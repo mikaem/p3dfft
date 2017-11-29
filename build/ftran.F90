@@ -24,6 +24,7 @@
 !
 !----------------------------------------------------------------------------
 
+
 ! This is a C wrapper routine
 !========================================================
       subroutine p3dfft_ftran_r2c_many_w (XgYZ,dim_in,XYZg,dim_out,nv,op) BIND(C,NAME='p3dfft_ftran_r2c_many')
@@ -182,7 +183,7 @@
 
 #ifdef STRIDE1
 ! For stride1 option combine second transpose with transform in Z
-         call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize,op)
+         call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize)
          call fcomm2_trans_many(buf,XYZg,buf,dim_out,nv,op,timers(2),timers(8))
 #else
 
@@ -494,6 +495,9 @@
       else
 
 #ifdef STRIDE1
+#ifdef DEBUG
+	print *,taskid,': Calling reorder_f1'
+#endif
          call reorder_f1(buf2,buf,buf1)
 #else
 	call seg_copy_x(buf2,buf,1,nxhpc,0,nxhp,nxhpc,jisize,kjsize)
@@ -542,6 +546,8 @@
          call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize,op)
          call fcomm2_trans(buf,XYZg,buf,op,dummytimers(1),dummytimers(2))
          timers(2) = MPI_Wtime() - timers(2)
+         call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize)
+         call fcomm2_trans(buf,XYZg,buf,op,timers(2),timers(8))
 #else
 
 ! FFT Transform (C2C) in Z for all x and y
@@ -825,5 +831,3 @@ subroutine f_r2c_many(source,str1,dest,str2,n,m,dim,nv)
 
 	    return
 	    end subroutine
-
-
