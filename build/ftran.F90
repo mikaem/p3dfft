@@ -538,8 +538,10 @@
 
 #ifdef STRIDE1
 ! For stride1 option combine second transpose with transform in Z
+         timers(2) = MPI_Wtime()
          call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize,op)
-         call fcomm2_trans(buf,XYZg,buf,op,timers(2),timers(8))
+         call fcomm2_trans(buf,XYZg,buf,op,dummytimers(1),dummytimers(2))
+         timers(2) = MPI_Wtime() - timers(2)
 #else
 
 ! FFT Transform (C2C) in Z for all x and y
@@ -561,9 +563,9 @@
 #ifdef DEBUG
 	print *,taskid,': Transforming in Z'
 #endif
-         timers(8) = MPI_Wtime()
 
          if(iisize * jjsize .gt. 0) then
+             timers(8) = MPI_Wtime()
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf,iisize*jjsize, 1, buf,iisize*jjsize, 1,nz,iisize*jjsize)
 
@@ -582,14 +584,16 @@
 		print *,'Unknown transform type: ',op(3:3)
 		call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
+            timers(8) = MPI_Wtime() - timers(8)
 
+            timers(2) = timers(2) - MPI_Wtime()
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
+            timers(2) = timers(2) + MPI_Wtime()
 
-	endif
-	timers(8) = MPI_Wtime() - timers(8)
+	endif   ! iisize * jisize
 
-      else
+      else      ! dnz .gt. 0
 
         timers(2) = MPI_Wtime()
 
@@ -627,27 +631,31 @@
             endif
 
         endif
-     endif
+        timers(8) = MPI_Wtime() - timers(8)
 
-     timers(8) = MPI_Wtime() - timers(8)
+     endif     ! dnz .gt. 0
 
 
-#endif
+#endif         !! STRIDE1
 
-      else
+      else    ! jproc .gt. 1
 
-         timers(8) = MPI_Wtime()
 
 #ifdef STRIDE1
+        timers(2) = MPI_Wtime()
          call reorder_trans_f2(buf,XYZg,buf1,op)
+        timers(2) = MPI_Wtime() - timers(2)
 #else
          Nl = iisize*jjsize*nz
          dnz = nz - nzc
 	 if(dnz .gt. 0) then
-
+	    timers(2) = MPI_Wtime()
 	    dny = ny - nyc
 	    call seg_copy_y(buf,buf1,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,buf1,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
+            timers(2) = MPI_Wtime() - timers(2)
+
+            timers(8) = MPI_Wtime()
 
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf1,iisize*jjsize, 1,buf1,iisize*jjsize, 1,nz,iisize*jjsize)
@@ -667,16 +675,21 @@
 		print *,'Unknown transform type: ',op(3:3)
 		call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
+            timers(8) = MPI_Wtime() - timers(8)
 
+           timers(2) = timers(2) - MPI_Wtime()
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
+           timers(2) = timers(2) + MPI_Wtime()
+ 	else
 
-	else
-
+ 	    timers(2) = MPI_Wtime()
 	    dny = ny - nyc
 	    call seg_copy_y(buf,XYZg,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,XYZg,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
+	    timers(2) = MPI_Wtime() - timers(2)
 
+	    timers(8) = MPI_Wtime()
             if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(XYZg,iisize*jjsize, 1, XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
 
@@ -695,12 +708,11 @@
                 print *,'Unknown transform type: ',op(3:3)
                 call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
+            timers(8) = MPI_Wtime() - timers(8)
 
 
         endif
 #endif
-
-        timers(8) = MPI_Wtime() - timers(8)
 
       endif
 

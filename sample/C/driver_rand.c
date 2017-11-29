@@ -80,6 +80,8 @@ int main(int argc,char **argv)
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
+   double tf[5][100],tb[5][100], tt[100];
+   double t0, t1;
 
 #ifndef SINGLE_PREC
    void print_all(double *,long int,int,long int),mult_array(double *,long int,double);
@@ -206,33 +208,38 @@ int main(int argc,char **argv)
    rfast = 1e8;
    for(m=0;m < n;m++) {
 
-     if(proc_id == 0)
-        printf("Iteration %d\n",m);
-
      MPI_Barrier(MPI_COMM_WORLD);
      /* Forward transform */
      rtime1 = MPI_Wtime();
      Cp3dfft_ftran_r2c(A,B,op_f);
-//      rtime1 = rtime1 + MPI_Wtime();
-
-     /*
-     if(proc_id == 0)
-        printf("Result of forward transform\n");
-
-     print_all(B,Ntot,proc_id,Nglob);
-     */
-/* normalize */
-     mult_array(B,Ntot,factor);
+     get_timers(timers);
+     tf[0][m] = timers[5-1];
+     tf[1][m] = timers[1-1];
+     tf[2][m] = timers[7-1];
+     tf[3][m] = timers[2-1];
+     tf[4][m] = timers[8-1];
 
      /* Backward transform */
-//      rtime1 = rtime1 - MPI_Wtime();
      Cp3dfft_btran_c2r(B,C,op_b);
-     MPI_Barrier(MPI_COMM_WORLD);
+     get_timers(timers);
+     tb[4][m] = timers[9-1];
+     tb[3][m] = timers[3-1];
+     tb[2][m] = timers[10-1];
+     tb[1][m] = timers[4-1];
+     tb[0][m] = timers[12-1];
+
      rtime1 = MPI_Wtime() - rtime1;
-     rfast = (rtime1 < rfast) ? rtime1 : rfast;
-     ravg += rtime1;
+     tt[m] = rtime1;
+
+     /* normalize */
+     mult_array(C,Ntot,factor);
 
    }
+
+  MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tf,5*n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tb,5*n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+
    /* Free work space */
   Cp3dfft_clean();
 
@@ -248,8 +255,6 @@ int main(int argc,char **argv)
           p1++;
           p2++;
         }
-
-   get_timers(timers);
 
    MPI_Reduce(&cdiff,&ccdiff,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
@@ -285,13 +290,41 @@ int main(int argc,char **argv)
     gt[i] = gt[i]/ ((double) nproc);
   }
 
-  if(proc_id == 0) {
-     printf("Average=%lg\n",rtime2/((double) n));
-     printf("Fastest=%lg\n",rfast);
-     for(i=0;i < 12;i++) {
-       printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
-     }
+  if (proc_id == 0)
+  {
+      t0 = 1e8;
+      t1 = 0.;
+      for (i=0; i<n; i++)
+      {
+          t0 = (tt[i] < t0) ? tt[i] : t0;
+          t1 += tt[i];
+          for (j=0; j<5; j++)
+          {
+            tf[j][0] = (tf[j][i] < tf[j][0]) ? tf[j][i] : tf[j][0];
+            tb[j][0] = (tb[j][i] < tb[j][0]) ? tb[j][i] : tb[j][0];
+          }
+      }
+      printf("Fastest=%.6e \n", t0);
+      printf("Average=%.6e \n", t1/((double) n));
+      printf("r2c=%.6e \n", tf[0][0]);
+      printf("fc2c1=%.6e \n", tf[2][0]);
+      printf("fc2c2=%.6e \n", tf[4][0]);
+      printf("bc2c2=%.6e \n", tb[4][0]);
+      printf("bc2c1=%.6e \n", tb[2][0]);
+      printf("bc2r=%.6e \n", tb[0][0]);
+      printf("Alltoall_f0=%.6e\n", tf[1][0]);
+      printf("Alltoall_f1=%.6e\n", tf[3][0]);
+      printf("Alltoall_b1=%.6e\n", tb[3][0]);
+      printf("Alltoall_b0=%.6e\n", tb[1][0]);
   }
+
+//   if(proc_id == 0) {
+//      printf("Average=%lg\n",rtime2/((double) n));
+//      printf("Fastest=%lg\n",rfast);
+//      for(i=0;i < 12;i++) {
+//        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
+//      }
+//   }
 
   MPI_Finalize();
 
