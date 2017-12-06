@@ -49,8 +49,8 @@
       integer, parameter, public :: r8 = KIND(1.0d0)
       integer, parameter, public :: i8 = SELECTED_INT_KIND(18)
       integer, save, public :: num_thr,padi
-      real(r8), save,public :: timers(12)
-      real(r8), save :: timer(12)
+      real(r8), save,public :: timers(16)
+      real(r8), save :: timer(16)
        integer, public :: real_size,complex_size
 
       integer,save :: NX_fft,NY_fft,NZ_fft,nxh,nxhp,nv_preset
@@ -648,7 +648,7 @@
       subroutine get_timers_w(timer) BIND(C,name='get_timers')
 !========================================================
 
-      real(r8) timer(12)
+      real(r8) timer(16)
 
       call get_timers(timer)
 
@@ -663,7 +663,7 @@
       end subroutine
 
       subroutine get_timers(timer)
-         real(r8) timer(12)
+         real(r8) timer(16)
          timer(1) = timers(1)
          timer(2) = timers(2)
          timer(3) = timers(3)
@@ -676,6 +676,10 @@
          timer(10) = timers(10)
          timer(11) = timers(11)
          timer(12) = timers(12)
+         timer(13) = timers(13)
+         timer(14) = timers(14)
+         timer(15) = timers(15)
+         timer(16) = timers(16)
       end subroutine
 
       subroutine set_timers()

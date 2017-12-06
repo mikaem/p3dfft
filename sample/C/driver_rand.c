@@ -76,11 +76,11 @@ int main(int argc,char **argv)
    long int Ntot,Nglob;
    double pi,twopi,sinyz,cdiff,ccdiff,ans,prec;
    double *sinx,*siny,*sinz,factor,r;
-   double rtime1,rtime2,rfast,rfast2,ravg,gt[12],gt1[12],gt2[12],timers[12];
+   double rtime1,rtime2,rfast,rfast2,ravg,gt[12],gt1[12],gt2[12],timers[16];
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
-   double tf[5][100],tb[5][100], tt[100];
+   double tf[5][100],tb[5][100], tt[100], tav[4][100];
    double t0, t1;
 
 #ifndef SINGLE_PREC
@@ -92,6 +92,8 @@ int main(int argc,char **argv)
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&nproc);
    MPI_Comm_rank(MPI_COMM_WORLD,&proc_id);
+   fftw_init_threads();
+   fftw_plan_with_nthreads(1);
 
    pi = atan(1.0)*4.0;
    twopi = 2.0*pi;
@@ -204,59 +206,63 @@ int main(int argc,char **argv)
    Nglob *= nz;
    factor = 1.0/Nglob;
 
-   rtime1 = 0.0;
-   rfast = 1e8;
-   for(m=0;m < n;m++) {
+  rtime1 = 0.0;
+  rfast = 1e8;
+  for(m=0;m < n;m++) {
 
-     MPI_Barrier(MPI_COMM_WORLD);
-     /* Forward transform */
-     rtime1 = MPI_Wtime();
-     Cp3dfft_ftran_r2c(A,B,op_f);
-     get_timers(timers);
-     tf[0][m] = timers[5-1];
-     tf[1][m] = timers[1-1];
-     tf[2][m] = timers[7-1];
-     tf[3][m] = timers[2-1];
-     tf[4][m] = timers[8-1];
+    MPI_Barrier(MPI_COMM_WORLD);
+    /* Forward transform */
+    rtime1 = MPI_Wtime();
+    Cp3dfft_ftran_r2c(A,B,op_f);
+    get_timers(timers);
+    tf[0][m] = timers[5-1];
+    tf[1][m] = timers[1-1];
+    tf[2][m] = timers[7-1];
+    tf[3][m] = timers[2-1];
+    tf[4][m] = timers[8-1];
+    tav[0][m] = timers[13-1];
+    tav[1][m] = timers[14-1];
+  
+    /* Backward transform */
+    Cp3dfft_btran_c2r(B,C,op_b);
+    get_timers(timers);
+    tb[4][m] = timers[9-1];
+    tb[3][m] = timers[3-1];
+    tb[2][m] = timers[10-1];
+    tb[1][m] = timers[4-1];
+    tb[0][m] = timers[12-1];
+    tav[2][m] = timers[15-1];
+    tav[3][m] = timers[16-1];
+    rtime1 = MPI_Wtime() - rtime1;
+    tt[m] = rtime1;
 
-     /* Backward transform */
-     Cp3dfft_btran_c2r(B,C,op_b);
-     get_timers(timers);
-     tb[4][m] = timers[9-1];
-     tb[3][m] = timers[3-1];
-     tb[2][m] = timers[10-1];
-     tb[1][m] = timers[4-1];
-     tb[0][m] = timers[12-1];
+    /* normalize */
+    mult_array(C,Ntot,factor);
 
-     rtime1 = MPI_Wtime() - rtime1;
-     tt[m] = rtime1;
+  }
 
-     /* normalize */
-     mult_array(C,Ntot,factor);
+ MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(MPI_IN_PLACE,tf,5*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(MPI_IN_PLACE,tb,5*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+ MPI_Allreduce(MPI_IN_PLACE,tav,4*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
-   }
+  /* Free work space */
+ //Cp3dfft_clean();
 
-  MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE,tf,5*n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
-  MPI_Allreduce(MPI_IN_PLACE,tb,5*n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
-
-   /* Free work space */
-  Cp3dfft_clean();
-
-  /* Check results */
-  cdiff = 0.0; p2 = C;p1 = A;
-  for(z=0;z < isize[2];z++)
-    for(y=0;y < isize[1];y++)
-       for(x=0;x < isize[0];x++) {
-	 if(cdiff < fabs(*p2 - *p1)) {
-           cdiff = fabs(*p2 - *p1);
-	   /* 	   printf("x,y,z=%d %d %d,cdiff,p1,p2=%f %f %f\n",x,y,z,cdiff,*p1,*p2); */
-	 }
-          p1++;
-          p2++;
+ /* Check results */
+ cdiff = 0.0; p2 = C;p1 = A;
+ for(z=0;z < isize[2];z++)
+   for(y=0;y < isize[1];y++)
+      for(x=0;x < isize[0];x++) {
+        if(cdiff < fabs(*p2 - *p1)) {
+          cdiff = fabs(*p2 - *p1);
+          /* 	   printf("x,y,z=%d %d %d,cdiff,p1,p2=%f %f %f\n",x,y,z,cdiff,*p1,*p2); */
         }
+         p1++;
+         p2++;
+       }
 
-   MPI_Reduce(&cdiff,&ccdiff,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+  MPI_Reduce(&cdiff,&ccdiff,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
   if(proc_id == 0) {
 #ifndef SINGLE_PREC
@@ -268,55 +274,67 @@ int main(int argc,char **argv)
       printf("Results are incorrect\n");
     else
       printf("Results are correct\n");
-
+ 
     printf("max diff =%g\n",ccdiff);
   }
 
 
 
-  /* Gather timing statistics */
-  MPI_Reduce(&ravg,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
-  MPI_Reduce(&rfast,&rfast2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+ /* Gather timing statistics */
+ //MPI_Reduce(&ravg,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+ //MPI_Reduce(&rfast,&rfast2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
-  for (i=0;i < 12;i++) {
-    timers[i] = timers[i] / ((double) n);
-  }
+ //for (i=0;i < 12;i++) {
+ //  timers[i] = timers[i] / ((double) n);
+ //}
 
-  MPI_Reduce(&timers,&gt,12,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
-  MPI_Reduce(&timers,&gt1,12,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
-  MPI_Reduce(&timers,&gt2,12,MPI_DOUBLE,MPI_MIN,0,MPI_COMM_WORLD);
+ //MPI_Reduce(&timers,&gt,12,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
+ //MPI_Reduce(&timers,&gt1,12,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
+ //MPI_Reduce(&timers,&gt2,12,MPI_DOUBLE,MPI_MIN,0,MPI_COMM_WORLD);
 
-  for (i=0;i < 12;i++) {
-    gt[i] = gt[i]/ ((double) nproc);
-  }
+ //for (i=0;i < 12;i++) {
+ //  gt[i] = gt[i]/ ((double) nproc);
+ //}
 
-  if (proc_id == 0)
-  {
-      t0 = 1e8;
-      t1 = 0.;
-      for (i=0; i<n; i++)
-      {
-          t0 = (tt[i] < t0) ? tt[i] : t0;
-          t1 += tt[i];
-          for (j=0; j<5; j++)
-          {
-            tf[j][0] = (tf[j][i] < tf[j][0]) ? tf[j][i] : tf[j][0];
-            tb[j][0] = (tb[j][i] < tb[j][0]) ? tb[j][i] : tb[j][0];
-          }
-      }
-      printf("Fastest=%.6e \n", t0);
-      printf("Average=%.6e \n", t1/((double) n));
-      printf("r2c=%.6e \n", tf[0][0]);
-      printf("fc2c1=%.6e \n", tf[2][0]);
-      printf("fc2c2=%.6e \n", tf[4][0]);
-      printf("bc2c2=%.6e \n", tb[4][0]);
-      printf("bc2c1=%.6e \n", tb[2][0]);
-      printf("bc2r=%.6e \n", tb[0][0]);
-      printf("Alltoall_f0=%.6e\n", tf[1][0]);
-      printf("Alltoall_f1=%.6e\n", tf[3][0]);
-      printf("Alltoall_b1=%.6e\n", tb[3][0]);
-      printf("Alltoall_b0=%.6e\n", tb[1][0]);
-  }
+ if (proc_id == 0)
+ {
+     t0 = 1e8;
+     t1 = 0.;
+     for (i=0; i<n; i++)
+     {
+         t0 = (tt[i] < t0) ? tt[i] : t0;
+         t1 += tt[i];
+         for (j=0; j<5; j++)
+         {
+           tf[j][0] = (tf[j][i] < tf[j][0]) ? tf[j][i] : tf[j][0];
+           tb[j][0] = (tb[j][i] < tb[j][0]) ? tb[j][i] : tb[j][0];
+         }
+
+         for (j=0; j<2; j++)
+         {
+           tav[j][0] = (tav[j][i] < tav[j][0]) ? tav[j][i] : tav[j][0];
+         }
+     }
+     printf("Fastest=%.6e \n", t0);
+     printf("Average=%.6e \n", t1/((double) n));
+     printf("r2c=%.6e \n", tf[0][0]);
+     printf("fc2c1=%.6e \n", tf[2][0]);
+     printf("fc2c2=%.6e \n", tf[4][0]);
+     printf("bc2c2=%.6e \n", tb[4][0]);
+     printf("bc2c1=%.6e \n", tb[2][0]);
+     printf("bc2r=%.6e \n", tb[0][0]);
+     printf("Alltoall_f0=%.6e\n", tf[1][0]);
+     printf("Alltoall_f1=%.6e\n", tf[3][0]);
+     printf("Alltoall_b1=%.6e\n", tb[3][0]);
+     printf("Alltoall_b0=%.6e\n", tb[1][0]);
+     printf("Alltoallv0=%.6e\n", tav[0][0]);
+     printf("Alltoallv1=%.6e\n", tav[1][0]);
+     printf("Alltoallv2=%.6e\n", tav[2][0]);
+     printf("Alltoallv3=%.6e\n", tav[3][0]);
+ }
+// free(A);
+// free(B);
+// free(C);
 
 //   if(proc_id == 0) {
 //      printf("Average=%lg\n",rtime2/((double) n));
@@ -325,7 +343,7 @@ int main(int argc,char **argv)
 //        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
 //      }
 //   }
-
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
 
 }

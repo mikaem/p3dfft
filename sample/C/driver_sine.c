@@ -45,7 +45,7 @@ int main(int argc,char **argv)
    long int Nglob,Ntot;
    double pi,twopi,sinyz;
    double *sinx,*siny,*sinz,factor;
-   double rfast,rfast2,ravg,rtime1,rtime2,gt[12],gt1[12],gt2[12],timers[12];
+   double rtime1,rtime2,gt[12],gt1[12],gt2[12],timers[12];
    double tcomm,gtcomm[3];
    double cdiff,ccdiff,ans,prec;
    FILE *fp;
@@ -189,29 +189,48 @@ int main(int argc,char **argv)
    factor = 1.0/Nglob;
 
    rtime1 = 0.0;
-   rfast = 100000.;
-   ravg = 0;
    for(m=0;m < n;m++) {
 
      if(proc_id == 0)
         printf("Iteration %d\n",m);
      MPI_Barrier(MPI_COMM_WORLD);
      rtime1 = MPI_Wtime();
-     /* compute forward Fourier transform on A, store results in B */
+   /* compute forward Fourier transform on A, store results in B */
      Cp3dfft_ftran_r2c(A,B,op_f);
+     rtime1 = MPI_Wtime() - rtime1;
 
-     /* Compute backward transform on B, store results in C */
+     if(proc_id == 0)
+        printf("Result of forward transform\n");
+
+     print_all(B,Ntot,proc_id,Nglob);
+
+   /* Compute backward transform on B, store results in C */
+     MPI_Barrier(MPI_COMM_WORLD);
+     rtime2 = MPI_Wtime();
+   /* normalize */
+     mult_array(B,Ntot,factor);
+
      Cp3dfft_btran_c2r(B,C,op_b);
-     rtime1 = MPI_Wtime()-rtime1;
-     tt[m] = rtime1;
-     /* normalize */
-     mult_array(C,Ntot,factor);
+     rtime2 = MPI_Wtime()-rtime2;
+
+     tt[m] = rtime1 + rtime2;
+
    }
-   /* free work space */
-  Cp3dfft_clean();
+ /* free work space */
+  //Cp3dfft_clean();
 
   MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
+  rfast = 1e8;
+  ravg = 0.;
+  for(m=0;m < n;m++) {
+      rfast = (tt[m] < rfast) ? tt[m] : rfast;
+      ravg += tt[m];
+  }
+  ravg /= (double) n;
+
+  /* Check results */
+  cdiff = 0.0; p = C;
   for(z=0;z < isize[2];z++)
     for(y=0;y < isize[1];y++)  {
        sinyz =siny[y]*sinz[z];
@@ -219,13 +238,13 @@ int main(int argc,char **argv)
           ans = sinx[x]*sinyz;
           if(cdiff < fabs(*p - ans))
            cdiff = fabs(*p - ans);
-	   p++;
+       p++;
         }
     }
 
    Cget_timers(timers);
 
-# ifndef SINGLE_PREC
+#ifndef SINGLE_PREC
    MPI_Reduce(&cdiff,&ccdiff,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 #else
    MPI_Reduce(&cdiff,&ccdiff,1,MPI_REAL,MPI_MAX,0,MPI_COMM_WORLD);
@@ -247,16 +266,7 @@ int main(int argc,char **argv)
 
 
   /* Gather timing statistics */
-
-  //MPI_Reduce(&rfast,&rtime2,1,MPI_DOUBLE,MPI_MIN,0,MPI_COMM_WORLD);
-  //MPI_Reduce(&ravg,&rtime1,1,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
-  //rtime1 /= ((double) nproc);
-  ravg = 0.;
-  rfast = 10000;
-  for(m=0;m < n;m++) {
-    ravg += tt[m];
-    rfast = (tt[m] < rfast) ? tt[m] : rfast;
-  }
+//   MPI_Reduce(&rtime1,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
 
   for (i=0;i < 12;i++) {
     timers[i] = timers[i] / ((double) n);
@@ -275,13 +285,19 @@ int main(int argc,char **argv)
   }
 
   if(proc_id == 0) {
+     printf("Average=%lg\n",ravg);
      printf("Fastest=%lg\n",rfast);
-     printf("Average=%lg\n",ravg / ((double) n));
      for(i=0;i < 12;i++) {
        printf("timer[%d] (avg/max/min): %lE %lE %lE\n",i+1,gt[i],gt1[i],gt2[i]);
      }
   }
 
+  free(A);
+  free(B);
+  free(C);
+  free(sinx);
+  free(siny);
+  free(sinz);
   MPI_Finalize();
 
 }
@@ -325,5 +341,6 @@ void print_all(float *A,long int nar,int proc_id,long int Nglob)
 #endif
     }
 }
+
 
 

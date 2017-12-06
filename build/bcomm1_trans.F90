@@ -54,17 +54,15 @@
 
 !     Pack the data for sending
 
-      tc = tc - MPI_Wtime()
 
       allocate(buf3(nz_fft,jjsize))
 
      if(jjsize .gt. 0) then
         do j=1,nv
-          call pack_bcomm1_trans(buf1,source(1,j),buf3,j,nv,op)
+          call pack_bcomm1_trans(buf1,source(1,j),buf3,j,nv,op,tc)
 	enddo
      endif
 
-      tc = tc + MPI_Wtime()
       t = t - MPI_Wtime()
 
 #ifdef USE_EVEN
@@ -161,7 +159,7 @@
       end subroutine
 
 
-      subroutine pack_bcomm1_trans(sendbuf,source,buf3,j,nv,op)
+      subroutine pack_bcomm1_trans(sendbuf,source,buf3,j,nv,op,tc)
 
       implicit none
 
@@ -175,7 +173,9 @@
       integer nz,dnz,i,j,x,y,z,iz,iy,z2,y2,ierr,nv
       integer*8 position,pos0,pos1,pos2
       character(len=3) op
-
+      real(r8) tc
+      
+      tc = 0.
       nz = nz_fft
 
       dnz = nz - nzc
@@ -292,7 +292,7 @@
 		     buf3(z,y) = source(z-dnz,y,x)
  	          enddo
 	       enddo
-
+               tc = tc - MPI_Wtime()
    	       if(op(1:1) == 't' .or. op(1:1) == 'f') then
                 call exec_b_c2_same(buf3, 1,nz_fft, &
 				  buf3, 1,nz_fft,nz_fft,jjsize)
@@ -306,9 +306,10 @@
 		   print *,taskid,'Unknown transform type: ',op(1:1)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)
 	       endif
+               tc = tc + MPI_Wtime()
 
 	    else
-
+               tc = tc - MPI_Wtime()
      	       if(op(1:1) == 't' .or. op(1:1) == 'f') then
                   call exec_b_c2_dif(source(1,1,x), 1,nz_fft, &
 				  buf3, 1,nz_fft,nz_fft,jjsize)
@@ -322,7 +323,7 @@
 		   print *,taskid,'Unknown transform type: ',op(1:1)
 		   call MPI_abort(MPI_COMM_WORLD,ierr)
 	       endif
-
+               tc = tc + MPI_Wtime()
 	    endif
 
             do i=0,jproc-1
@@ -384,15 +385,12 @@
 
 !     Pack the data for sending
 
-      tc = tc - MPI_Wtime()
 
       allocate(buf3(nz_fft,jjsize))
 
-      call pack_bcomm1_trans(buf1,source,buf3,1,1,op)
+      call pack_bcomm1_trans(buf1,source,buf3,1,1,op,tc)
 
-
-      tc = tc + MPI_Wtime()
-      t = t - MPI_Wtime()
+      t = MPI_Wtime()
 #ifdef USE_EVEN
       call mpi_alltoall(buf1,KfCntMax, mpi_byte, buf2,KfCntMax,mpi_byte,mpi_comm_col,ierr)
 #else
@@ -400,10 +398,7 @@
 
       call mpi_alltoallv(buf1,JrSndCnts, JrSndStrt,mpi_byte, buf2,JrRcvCnts, JrRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
-
-      t = t + MPI_Wtime()
-
-      tc = tc - MPI_Wtime()
+      t = MPI_Wtime() - t
 
       call unpack_bcomm1_trans(dest,buf2)
 
@@ -411,8 +406,6 @@
 ! Unpack receive buffers into dest
 
       deallocate(buf3)
-
-      tc = tc + MPI_Wtime()
 
       return
       end subroutine

@@ -475,7 +475,6 @@
 
       if(jisize * kjsize .gt. 0) then
          call init_f_r2c(XgYZ,nx,buf2,nxhp,nx,jisize*kjsize)
-
          call exec_f_r2c(XgYZ,nx,buf2,nxhp,nx,jisize*kjsize)
 
       endif
@@ -490,7 +489,7 @@
 #ifdef DEBUG
 	print *,taskid,': Calling fcomm1'
 #endif
-         call fcomm1(buf2,buf,dummytimers(1),dummytimers(2))
+         call fcomm1(buf2,buf,timers(13),dummytimers(2))
 
       else
 
@@ -517,7 +516,6 @@
       if(iisize * kjsize .gt. 0) then
 #ifdef STRIDE1
          call init_f_c(buf,1,ny,buf,1,ny,ny,iisize*kjsize)
-
          call exec_f_c1(buf,1,ny,buf,1,ny,ny,iisize*kjsize)
 
 #else
@@ -537,17 +535,15 @@
 #endif
 
 
+    timers(2) = MPI_Wtime()
+
 ! Exchange data in columns
       if(jproc .gt. 1) then
 
 #ifdef STRIDE1
 ! For stride1 option combine second transpose with transform in Z
-         timers(2) = MPI_Wtime()
-         call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize,op)
-         call fcomm2_trans(buf,XYZg,buf,op,dummytimers(1),dummytimers(2))
-         timers(2) = MPI_Wtime() - timers(2)
          call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize)
-         call fcomm2_trans(buf,XYZg,buf,op,timers(2),timers(8))
+         call fcomm2_trans(buf,XYZg,buf,op,timers(14),timers(8))
 #else
 
 ! FFT Transform (C2C) in Z for all x and y
@@ -556,11 +552,8 @@
 	 if(dnz .gt. 0) then
 
 ! Transpose y-z
-         timers(2) = MPI_Wtime()
 
-         call fcomm2(buf,buf,dummytimers(1),dummytimers(2))
-
-         timers(2) = MPI_Wtime() - timers(2)
+         call fcomm2(buf,buf,timers(14),dummytimers(2))
 
 ! In forward transform we can safely use output array as one of the buffers
 ! This speeds up FFTW since it is non-stride-1 transform and it is
@@ -574,17 +567,14 @@
              timers(8) = MPI_Wtime()
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf,iisize*jjsize, 1, buf,iisize*jjsize, 1,nz,iisize*jjsize)
-
               call exec_f_c2_same(buf,iisize*jjsize, 1,buf,iisize*jjsize, 1,nz,iisize*jjsize)
 
 	    else if(op(3:3) == 'c') then
                call init_ctrans_r2(buf,2*iisize*jjsize, 1, buf,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
               call exec_ctrans_r2_same(buf,2*iisize*jjsize, 1,buf,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 
 	    else if(op(3:3) == 's') then
                call init_strans_r2(buf,2*iisize*jjsize, 1, buf,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
               call exec_strans_r2_same(buf,2*iisize*jjsize, 1,buf,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 	    else if(op(3:3) .ne. 'n' .and. op(3:3) .ne. '0') then
 		print *,'Unknown transform type: ',op(3:3)
@@ -592,21 +582,16 @@
             endif
             timers(8) = MPI_Wtime() - timers(8)
 
-            timers(2) = timers(2) - MPI_Wtime()
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
-            timers(2) = timers(2) + MPI_Wtime()
 
 	endif   ! iisize * jisize
 
       else      ! dnz .gt. 0
 
-        timers(2) = MPI_Wtime()
+        call fcomm2(buf,XYZg,timers(14),dummytimers(2))
 
-        call fcomm2(buf,XYZg,dummytimers(1),dummytimers(2))
-
-        timers(2) = MPI_Wtime() - timers(2)
-
+      
 ! In forward transform we can safely use output array as one of the buffers
 ! This speeds up FFTW since it is non-stride-1 transform and it is
 ! faster than done in-place
@@ -619,18 +604,15 @@
          if(iisize * jjsize .gt. 0) then
             if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(XYZg,iisize*jjsize, 1, XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
-
-              call exec_f_c2_same(XYZg,iisize*jjsize, 1,XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
+               call exec_f_c2_same(XYZg,iisize*jjsize, 1,XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
 
             else if(op(3:3) == 'c') then
                call init_ctrans_r2(XYZg,2*iisize*jjsize, 1, XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_ctrans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_ctrans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 
             else if(op(3:3) == 's') then
                call init_strans_r2(XYZg,2*iisize*jjsize, 1, XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_strans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_strans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
             else if(op(3:3) .ne. 'n' .and. op(3:3) .ne. '0') then
                 print *,'Unknown transform type: ',op(3:3)
                 call MPI_Abort(MPI_COMM_WORLD,ierr)
@@ -648,68 +630,54 @@
 
 
 #ifdef STRIDE1
-        timers(2) = MPI_Wtime()
          call reorder_trans_f2(buf,XYZg,buf1,op)
-        timers(2) = MPI_Wtime() - timers(2)
 #else
          Nl = iisize*jjsize*nz
          dnz = nz - nzc
 	 if(dnz .gt. 0) then
-	    timers(2) = MPI_Wtime()
 	    dny = ny - nyc
 	    call seg_copy_y(buf,buf1,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,buf1,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
-            timers(2) = MPI_Wtime() - timers(2)
 
             timers(8) = MPI_Wtime()
 
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf1,iisize*jjsize, 1,buf1,iisize*jjsize, 1,nz,iisize*jjsize)
-
-              call exec_f_c2_same(buf1,iisize*jjsize, 1,buf1,iisize*jjsize, 1,nz,iisize*jjsize)
+               call exec_f_c2_same(buf1,iisize*jjsize, 1,buf1,iisize*jjsize, 1,nz,iisize*jjsize)
 
 	    else if(op(3:3) == 'c') then
                call init_ctrans_r2(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_ctrans_r2_same(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_ctrans_r2_same(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 
 	    else if(op(3:3) == 's') then
-              call init_strans_r2(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_strans_r2_same(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call init_strans_r2(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_strans_r2_same(buf1,2*iisize*jjsize, 1,buf1,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 	    else if(op(3:3) /= 'n' .and. op(3:3) /= '0') then
 		print *,'Unknown transform type: ',op(3:3)
 		call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
             timers(8) = MPI_Wtime() - timers(8)
 
-           timers(2) = timers(2) - MPI_Wtime()
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
-           timers(2) = timers(2) + MPI_Wtime()
  	else
 
- 	    timers(2) = MPI_Wtime()
 	    dny = ny - nyc
 	    call seg_copy_y(buf,XYZg,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,XYZg,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
-	    timers(2) = MPI_Wtime() - timers(2)
 
 	    timers(8) = MPI_Wtime()
             if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(XYZg,iisize*jjsize, 1, XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
-
-              call exec_f_c2_same(XYZg,iisize*jjsize, 1,XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
+               call exec_f_c2_same(XYZg,iisize*jjsize, 1,XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
 
             else if(op(3:3) == 'c') then
                call init_ctrans_r2(XYZg,2*iisize*jjsize, 1, XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_ctrans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_ctrans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
 
             else if(op(3:3) == 's') then
                call init_strans_r2(XYZg,2*iisize*jjsize, 1, XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
-
-              call exec_strans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
+               call exec_strans_r2_same(XYZg,2*iisize*jjsize, 1,XYZg,2*iisize*jjsize, 1,nz,2*iisize*jjsize)
             else if(op(3:3) /= 'n' .and. op(3:3) /= '0') then
                 print *,'Unknown transform type: ',op(3:3)
                 call MPI_Abort(MPI_COMM_WORLD,ierr)
@@ -722,12 +690,14 @@
 
       endif
 
+
 #ifdef DEBUG
       print *,taskid,': Waiting at barrier'
 #endif
 
       call mpi_barrier(mpi_comm_world,ierr)
 
+      timers(2) = MPI_Wtime() - timers(2) - timers(8)  !Total time minus transform time
       return
       end subroutine
 

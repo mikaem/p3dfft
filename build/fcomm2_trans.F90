@@ -80,7 +80,7 @@
       tc = - MPI_Wtime() + tc
 
       do j=1,nv
-         call unpack_fcomm2_trans(dest(1,j),buf2,buf3,j,nv,op)
+         call unpack_fcomm2_trans(dest(1,j),buf2,buf3,j,nv,op,tc)
       enddo
 
       tc = tc + MPI_Wtime()
@@ -161,7 +161,7 @@
 
       end subroutine
 
-      subroutine unpack_fcomm2_trans(dest,recvbuf,buf3,j,nv,op)
+      subroutine unpack_fcomm2_trans(dest,recvbuf,buf3,j,nv,op,tc)
 
       use fft_spec
       implicit none
@@ -176,7 +176,9 @@
       integer x,z,y,i,ierr,xs,ys,y2,z2,iy,iz,ix,x2,n,sz,l,dny,dnz,nv,j,nz,dim_out
       integer(i8) position,pos1,pos0,pos2
       character(len=3) op
+      real(r8) tc
 
+      tc = 0.
       nz = nz_fft
       if(nz .ne. nzc) then
 	dnz = nz - nzc
@@ -310,7 +312,7 @@
                pos1 = pos1 + jjsize*iisize*NBz
            enddo
        enddo
-
+        tc = tc - MPI_Wtime()
 	if(op(3:3) == 't' .or. op(3:3) == 'f') then
              call exec_f_c2_same(buf3, 1,nz_fft, &
 			  buf3, 1,nz_fft,nz_fft,jjsize)
@@ -324,6 +326,7 @@
 	   print *,taskid,'Unknown transform type: ',op(3:3)
 	   call MPI_abort(MPI_COMM_WORLD,ierr)
 	endif
+        tc = tc + MPI_Wtime()
 
 	do y=1,jjsize
 	   do z=1,nzhc
@@ -413,7 +416,7 @@
                pos1 = pos1 + jjsize*iisize*NBz
             enddo
          enddo
-
+        tc = tc - MPI_Wtime()
 	if(op(3:3) == 't' .or. op(3:3) == 'f') then
              call exec_f_c2_dif(buf3, 1,nz_fft, &
 			  dest(1,1,x), 1,nz_fft,nz_fft,jjsize)
@@ -427,6 +430,7 @@
 	   print *,taskid,'Unknown transform type: ',op(3:3)
 	   call MPI_abort(MPI_COMM_WORLD,ierr)
 	endif
+        tc = tc + MPI_Wtime()
 
       enddo
 
@@ -457,7 +461,6 @@
 
       dny = ny_fft-nyc
 
-      t = MPI_Wtime()
 
 !$OMP PARALLEL DO private(i,pos0,position,x,y,z)
      do i=0,jproc-1
@@ -515,6 +518,7 @@
 
       enddo
 
+      t = MPI_Wtime()
 #ifdef USE_EVEN
       call mpi_alltoall(buf1,KfCntMax, mpi_byte, buf2,KfCntMax, mpi_byte,mpi_comm_col,ierr)
 #else
@@ -522,15 +526,15 @@
 
       call mpi_alltoallv(buf1,KfSndCnts, KfSndStrt,mpi_byte,buf2,KfRcvCnts, KfRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
+     t = MPI_Wtime() - t
 
      if(jjsize .gt. 0) then
 
 
-         call unpack_fcomm2_trans(dest,buf2,buf3,1,1,op)
+         call unpack_fcomm2_trans(dest,buf2,buf3,1,1,op,tc)
 
       endif
 
-      t = MPI_Wtime() - t
 
       return
       end subroutine

@@ -216,7 +216,7 @@
       enddo
 
       tc = tc + MPI_Wtime()
-      t = t - MPI_Wtime()
+      t =  MPI_Wtime()
 
 #ifdef USE_EVEN
       call mpi_alltoall (buf1,IfCntMax,mpi_byte, buf2,IfCntMax,mpi_byte,mpi_comm_row,ierr)
@@ -224,7 +224,7 @@
       call mpi_alltoallv (buf1,KrSndCnts, KrSndStrt, mpi_byte, buf2,KrRcvCnts,KrRcvStrt,mpi_byte,mpi_comm_row,ierr)
 #endif
 
-      t = t + MPI_Wtime()
+      t = MPI_Wtime() - t
       tc = tc - MPI_Wtime()
 
 ! Unpack receive buffers into dest

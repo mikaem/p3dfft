@@ -211,17 +211,17 @@
 ! Exchange y-z buffers in columns of processors
 
 
-      t = t - MPI_Wtime()
 
 #ifdef USE_EVEN
 ! Use MPI_Alltoall
 
       if(KfCntUneven) then
 
+         t = MPI_Wtime()
          call mpi_alltoall(buf1,KfCntMax, mpi_byte, &
            buf2,KfCntMax, mpi_byte,mpi_comm_col,ierr)
 
-         t = MPI_Wtime() + t
+         t = MPI_Wtime() - t
 
          tc = tc - MPI_Wtime()
 
@@ -243,19 +243,19 @@
          tc = tc + MPI_Wtime()
 
       else
-
+         t = MPI_Wtime()
          call mpi_alltoall(buf1,KfCntMax, mpi_byte, &
            dest,KfCntMax, mpi_byte,mpi_comm_col,ierr)
-         t = MPI_Wtime() + t
+         t = MPI_Wtime() - t
 
       endif
 
 #else
 ! Use MPI_Alltoallv
-
+      t = MPI_Wtime()
       call mpi_alltoallv(buf1,KfSndCnts, KfSndStrt,mpi_byte, &
            dest,KfRcvCnts, KfRcvStrt,mpi_byte,mpi_comm_col,ierr)
-      t = MPI_Wtime() + t
+      t = MPI_Wtime() - t
 
 #endif
       return

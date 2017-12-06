@@ -222,25 +222,25 @@
          enddo
          tc = tc + MPI_Wtime()
 
-         t = t - MPI_Wtime()
+         t = MPI_Wtime()
          call mpi_alltoall(buf1,KfCntMax,mpi_byte, &
               buf2,KfCntMax,mpi_byte,mpi_comm_col,ierr)
 
       else
-         t = t - MPI_Wtime()
+         t = MPI_Wtime()
          call mpi_alltoall(source,KfCntMax,mpi_byte, &
               buf2,KfCntMax,mpi_byte,mpi_comm_col,ierr)
       endif
 #else
 
 !     Exchange data in columns
-      t = t - MPI_Wtime()
+      t = MPI_Wtime()
       call mpi_alltoallv(source,JrSndCnts, JrSndStrt,mpi_byte, &
            buf2,JrRcvCnts, JrRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
 
 
-      t = t + MPI_Wtime()
+      t = MPI_Wtime() - t
 
 ! Unpack receive buffers into dest
       tc = tc - MPI_Wtime()
