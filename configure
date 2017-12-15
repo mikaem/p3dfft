@@ -2848,7 +2848,7 @@ if test "$enablecray" = "yes"; then
 
 $as_echo "#define CRAY 1" >>confdefs.h
 
-    eval FCFLAGS="\$FCFLAGS' -em -ef '"
+    eval FCFLAGS="\$FCFLAGS' -ef '"
     #eval FCFLAGS="\$FCFLAGS' -em -ef'"
     eval "ARRAY${N}='-DCRAY'"
     N=`expr $N + 1`

@@ -518,7 +518,7 @@
 
       enddo
 
-      t = MPI_Wtime()
+      t =  - MPI_Wtime()
 #ifdef USE_EVEN
       call mpi_alltoall(buf1,KfCntMax, mpi_byte, buf2,KfCntMax, mpi_byte,mpi_comm_col,ierr)
 #else
@@ -526,7 +526,7 @@
 
       call mpi_alltoallv(buf1,KfSndCnts, KfSndStrt,mpi_byte,buf2,KfRcvCnts, KfRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
-     t = MPI_Wtime() - t
+     t = t + MPI_Wtime()
 
      if(jjsize .gt. 0) then
 

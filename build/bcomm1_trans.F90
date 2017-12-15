@@ -390,7 +390,7 @@
 
       call pack_bcomm1_trans(buf1,source,buf3,1,1,op,tc)
 
-      t = MPI_Wtime()
+      t = t - MPI_Wtime()
 #ifdef USE_EVEN
       call mpi_alltoall(buf1,KfCntMax, mpi_byte, buf2,KfCntMax,mpi_byte,mpi_comm_col,ierr)
 #else
@@ -398,7 +398,7 @@
 
       call mpi_alltoallv(buf1,JrSndCnts, JrSndStrt,mpi_byte, buf2,JrRcvCnts, JrRcvStrt,mpi_byte,mpi_comm_col,ierr)
 #endif
-      t = MPI_Wtime() - t
+      t = t + MPI_Wtime()
 
       call unpack_bcomm1_trans(dest,buf2)
 

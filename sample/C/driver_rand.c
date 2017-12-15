@@ -56,6 +56,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "fftw3.h"
 
 double FORTNAME(t1),FORTNAME(t2),FORTNAME(t3),FORTNAME(t4),FORTNAME(tp1);
 /* double t1,t2,t3,t4,tp1; */
@@ -73,14 +74,15 @@ int main(int argc,char **argv)
    int istart[3],isize[3],iend[3];
    int fstart[3],fsize[3],fend[3];
    int iproc,jproc,ng[3],kmax,iex,conf,m,n;
-   long int Ntot,Nglob;
+   long int Ntot,Nglob,Ntt;
    double pi,twopi,sinyz,cdiff,ccdiff,ans,prec;
    double *sinx,*siny,*sinz,factor,r;
    double rtime1,rtime2,rfast,rfast2,ravg,gt[12],gt1[12],gt2[12],timers[16];
    FILE *fp;
    unsigned char op_f[]="fft", op_b[]="tff";
    int memsize[3];
-   double tf[5][100],tb[5][100], tt[100], tav[4][100];
+   int Ni = 3;
+   double tf[5][50],tb[5][50], tt[50], tav[4][50];
    double t0, t1;
 
 #ifndef SINGLE_PREC
@@ -92,8 +94,8 @@ int main(int argc,char **argv)
    MPI_Init(&argc,&argv);
    MPI_Comm_size(MPI_COMM_WORLD,&nproc);
    MPI_Comm_rank(MPI_COMM_WORLD,&proc_id);
-   fftw_init_threads();
-   fftw_plan_with_nthreads(1);
+//    fftw_init_threads();
+//    fftw_plan_with_nthreads(1);
 
    pi = atan(1.0)*4.0;
    twopi = 2.0*pi;
@@ -128,6 +130,7 @@ int main(int argc,char **argv)
    MPI_Bcast(&nz,1,MPI_INT,0,MPI_COMM_WORLD);
    MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
    MPI_Bcast(&ndim,1,MPI_INT,0,MPI_COMM_WORLD);
+   MPI_Barrier(MPI_COMM_WORLD);
 
    if(ndim == 1) {
      dims[0] = 1; dims[1] = nproc;
@@ -195,11 +198,11 @@ int main(int argc,char **argv)
    for(z=0;z < isize[2];z++)
      for(y=0;y < isize[1];y++)
        for(x=0;x < isize[0];x++) {
-          r = rand()*1.0/RAND_MAX;
+          r = rand()*1.0/((double) RAND_MAX);
           *p1++ = r;
 	  *p2++ = 0.0;
        }
-
+   Ntt = isize[0]*isize[1]*isize[2];
    Ntot = fsize[0]*fsize[1];
    Ntot *= fsize[2]*2;
    Nglob = nx * ny;
@@ -210,41 +213,52 @@ int main(int argc,char **argv)
   rfast = 1e8;
   for(m=0;m < n;m++) {
 
+    for(j=0; j<5; j++)
+    {
+      tf[j][m] = 0.;
+      tb[j][m] = 0.;
+      if(j < 4)
+        tav[j][m] = 0.;
+    }
+
     MPI_Barrier(MPI_COMM_WORLD);
+    tt[m] = -MPI_Wtime();
+    for(j=0; j<Ni; j++)
+    {
     /* Forward transform */
-    rtime1 = MPI_Wtime();
     Cp3dfft_ftran_r2c(A,B,op_f);
-    get_timers(timers);
-    tf[0][m] = timers[5-1];
-    tf[1][m] = timers[1-1];
-    tf[2][m] = timers[7-1];
-    tf[3][m] = timers[2-1];
-    tf[4][m] = timers[8-1];
-    tav[0][m] = timers[13-1];
-    tav[1][m] = timers[14-1];
-  
-    /* Backward transform */
+        /* Backward transform */
     Cp3dfft_btran_c2r(B,C,op_b);
+        /* normalize */
+   for(k=0; k<Ntt; k++)
+       C[k] /= ((double) Ntt);
+//    mult_array(C,Ntot,factor);
+    }
+    tt[m] += MPI_Wtime();
+    tt[m] /= ((double) Ni);
     get_timers(timers);
-    tb[4][m] = timers[9-1];
-    tb[3][m] = timers[3-1];
-    tb[2][m] = timers[10-1];
-    tb[1][m] = timers[4-1];
-    tb[0][m] = timers[12-1];
-    tav[2][m] = timers[15-1];
-    tav[3][m] = timers[16-1];
-    rtime1 = MPI_Wtime() - rtime1;
-    tt[m] = rtime1;
+    tf[0][m] = timers[5-1]/((double) Ni);
+    tf[1][m] = timers[1-1]/((double) Ni);
+    tf[2][m] = timers[7-1]/((double) Ni);
+    tf[3][m] = timers[2-1]/((double) Ni);
+    tf[4][m] = timers[8-1]/((double) Ni);
+    tb[4][m] = timers[9-1]/((double) Ni);
+    tb[3][m] = timers[3-1]/((double) Ni);
+    tb[2][m] = timers[10-1]/((double) Ni);
+    tb[1][m] = timers[4-1]/((double) Ni);
+    tb[0][m] = timers[12-1]/((double) Ni);
+    tav[0][m] = timers[13-1]/((double) Ni);
+    tav[1][m] = timers[14-1]/((double) Ni);
+    tav[2][m] = timers[15-1]/((double) Ni);
+    tav[3][m] = timers[16-1]/((double) Ni);
+    set_timers(timers);
 
-    /* normalize */
-    mult_array(C,Ntot,factor);
+ }
 
-  }
-
- MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
- MPI_Allreduce(MPI_IN_PLACE,tf,5*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
- MPI_Allreduce(MPI_IN_PLACE,tb,5*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
- MPI_Allreduce(MPI_IN_PLACE,tav,4*100,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tt,n,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tf,5*50,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tb,5*50,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE,tav,4*50,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
 
   /* Free work space */
  //Cp3dfft_clean();
@@ -256,7 +270,7 @@ int main(int argc,char **argv)
       for(x=0;x < isize[0];x++) {
         if(cdiff < fabs(*p2 - *p1)) {
           cdiff = fabs(*p2 - *p1);
-          /* 	   printf("x,y,z=%d %d %d,cdiff,p1,p2=%f %f %f\n",x,y,z,cdiff,*p1,*p2); */
+          //printf("x,y,z=%d %d %d,cdiff,p1,p2=%f %f %f\n",x,y,z,cdiff,*p1,*p2);
         }
          p1++;
          p2++;
@@ -274,11 +288,9 @@ int main(int argc,char **argv)
       printf("Results are incorrect\n");
     else
       printf("Results are correct\n");
- 
+
     printf("max diff =%g\n",ccdiff);
   }
-
-
 
  /* Gather timing statistics */
  //MPI_Reduce(&ravg,&rtime2,1,MPI_DOUBLE,MPI_MAX,0,MPI_COMM_WORLD);
@@ -310,28 +322,34 @@ int main(int argc,char **argv)
            tb[j][0] = (tb[j][i] < tb[j][0]) ? tb[j][i] : tb[j][0];
          }
 
-         for (j=0; j<2; j++)
+         for (j=0; j<4; j++)
          {
            tav[j][0] = (tav[j][i] < tav[j][0]) ? tav[j][i] : tav[j][0];
          }
      }
-     printf("Fastest=%.6e \n", t0);
-     printf("Average=%.6e \n", t1/((double) n));
-     printf("r2c=%.6e \n", tf[0][0]);
-     printf("fc2c1=%.6e \n", tf[2][0]);
-     printf("fc2c2=%.6e \n", tf[4][0]);
-     printf("bc2c2=%.6e \n", tb[4][0]);
-     printf("bc2c1=%.6e \n", tb[2][0]);
-     printf("bc2r=%.6e \n", tb[0][0]);
-     printf("Alltoall_f0=%.6e\n", tf[1][0]);
-     printf("Alltoall_f1=%.6e\n", tf[3][0]);
-     printf("Alltoall_b1=%.6e\n", tb[3][0]);
-     printf("Alltoall_b0=%.6e\n", tb[1][0]);
-     printf("Alltoallv0=%.6e\n", tav[0][0]);
-     printf("Alltoallv1=%.6e\n", tav[1][0]);
-     printf("Alltoallv2=%.6e\n", tav[2][0]);
-     printf("Alltoallv3=%.6e\n", tav[3][0]);
- }
+     printf("# Fastest=%.6e \n", t0);
+     printf("# Average=%.6e \n", t1/((double) n));
+     printf("# r2c=%.6e \n", tf[0][0]);
+     printf("# fc2c1=%.6e \n", tf[2][0]);
+     printf("# fc2c2=%.6e \n", tf[4][0]);
+     printf("# bc2c2=%.6e \n", tb[4][0]);
+     printf("# bc2c1=%.6e \n", tb[2][0]);
+     printf("# bc2r=%.6e \n", tb[0][0]);
+     printf("# Alltoall_f0=%.6e\n", tf[1][0]);
+     printf("# Alltoall_f1=%.6e\n", tf[3][0]);
+     printf("# Alltoall_b1=%.6e\n", tb[3][0]);
+     printf("# Alltoall_b0=%.6e\n", tb[1][0]);
+     printf("# Alltoallv0=%.6e\n", tav[0][0]);
+     printf("# Alltoallv1=%.6e\n", tav[1][0]);
+     printf("# Alltoallv2=%.6e\n", tav[2][0]);
+     printf("# Alltoallv3=%.6e\n", tav[3][0]);
+     for (i=0; i<n; i++)
+      {
+        for (j=0; j<5; j++) printf("%.6e ", tf[j][i]);
+        for (j=0; j<5; j++) printf("%.6e ", tb[j][i]);
+        printf("\n");
+     }
+}
 // free(A);
 // free(B);
 // free(C);

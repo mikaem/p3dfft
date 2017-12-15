@@ -195,7 +195,7 @@
          enddo
       enddo
       tc = tc + MPI_Wtime()
-      t = MPI_Wtime()
+      t = t - MPI_Wtime()
 
 #ifdef DEBUG
        print *,taskid,': fcomm1: initiating exchange'
@@ -214,8 +214,8 @@
       call mpi_alltoallv(buf1,IfSndCnts, IfSndStrt,mpi_byte, buf2,IfRcvCnts, IfRcvStrt,mpi_byte,mpi_comm_row,ierr)
 #endif
 
-      t = MPI_Wtime() - t
-      tc = - MPI_Wtime() + tc
+      t = t + MPI_Wtime()
+      tc = tc - MPI_Wtime()
 
 ! Unpack the data
 #ifdef DEBUG

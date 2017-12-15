@@ -57,7 +57,7 @@ AC_ARG_ENABLE(cray, [AC_HELP_STRING([--enable-cray], [compile P3DFFT using CRAY 
 AC_MSG_RESULT([$enablecray])
 if test "$enablecray" = "yes"; then
    	AC_DEFINE(CRAY, 1, [Define if you want to compile P3DFFT using CRAY compiler])
-    eval FCFLAGS="\$FCFLAGS' -em -ef '"
+    eval FCFLAGS="\$FCFLAGS' -ef '"
     #eval FCFLAGS="\$FCFLAGS' -em -ef'"
     eval "ARRAY${N}='-DCRAY'"
     N=`expr $N + 1`

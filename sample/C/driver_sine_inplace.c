@@ -232,7 +232,7 @@ int main(int argc,char **argv)
    }
 
    /* Free work space */
-  Cp3dfft_clean();
+  //Cp3dfft_clean();
 
   /* Check results */
   cdiff = 0.0; p = A;

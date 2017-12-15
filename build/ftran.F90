@@ -450,7 +450,7 @@
       integer x,y,z,i,nx,ny,nz,ierr,dnz,dny
       integer(i8) Nl
       character(len=3) op
-      real(r8) dummytimers(2)
+      real(r8) t8, dummytimers(2)
 
       if(.not. mpi_set) then
          print *,'P3DFFT error: call setup before other routines'
@@ -460,11 +460,13 @@
       nx = nx_fft
       ny = ny_fft
       nz = nz_fft
+     
+      t8 = 0.0
 
 ! For FFT libraries that require explicit allocation of work space,
 ! such as ESSL, initialize here
 
-     timers(5) = MPI_Wtime()
+     timers(5) =timers(5) - MPI_Wtime()
 
 #ifdef DEBUG
 	print *,taskid,': Enter ftran'
@@ -479,10 +481,10 @@
 
       endif
 
-     timers(5) = MPI_Wtime() - timers(5)
+     timers(5) = timers(5) + MPI_Wtime()
 
 ! Exchange data in rows
-     timers(1) = MPI_Wtime()
+     timers(1) = timers(1) - MPI_Wtime()
 
       if(iproc .gt. 1) then
 
@@ -503,11 +505,11 @@
 #endif
       endif
 
-      timers(1) = MPI_Wtime() - timers(1)
+      timers(1) = timers(1) + MPI_Wtime()
 
 ! FFT transform (C2C) in Y for all x and z, one Z plane at a time
 
-      timers(7) = MPI_Wtime()
+      timers(7) = timers(7) - MPI_Wtime()
 
 #ifdef DEBUG
 	print *,taskid,': Transforming in Y'
@@ -528,14 +530,14 @@
 #endif
       endif
 
-      timers(7) = MPI_Wtime() - timers(7)
+      timers(7) = timers(7) + MPI_Wtime()
 
 #ifdef DEBUG
 	print *,taskid,': Calling fcomm2'
 #endif
 
 
-    timers(2) = MPI_Wtime()
+    timers(2) = timers(2) - MPI_Wtime()
 
 ! Exchange data in columns
       if(jproc .gt. 1) then
@@ -543,7 +545,7 @@
 #ifdef STRIDE1
 ! For stride1 option combine second transpose with transform in Z
          call init_f_c(buf,1,nz, XYZg,1,nz,nz,jjsize)
-         call fcomm2_trans(buf,XYZg,buf,op,timers(14),timers(8))
+         call fcomm2_trans(buf,XYZg,buf,op,timers(14),t8)
 #else
 
 ! FFT Transform (C2C) in Z for all x and y
@@ -564,7 +566,7 @@
 #endif
 
          if(iisize * jjsize .gt. 0) then
-             timers(8) = MPI_Wtime()
+             t8 = MPI_Wtime()
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf,iisize*jjsize, 1, buf,iisize*jjsize, 1,nz,iisize*jjsize)
               call exec_f_c2_same(buf,iisize*jjsize, 1,buf,iisize*jjsize, 1,nz,iisize*jjsize)
@@ -580,7 +582,7 @@
 		print *,'Unknown transform type: ',op(3:3)
 		call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
-            timers(8) = MPI_Wtime() - timers(8)
+            t8 = MPI_Wtime() - t8
 
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	    call seg_copy_z(buf,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
@@ -599,7 +601,7 @@
 #ifdef DEBUG
         print *,taskid,': Transforming in Z'
 #endif
-         timers(8) = MPI_Wtime()
+         t8 = MPI_Wtime()
 
          if(iisize * jjsize .gt. 0) then
             if(op(3:3) == 't' .or. op(3:3) == 'f') then
@@ -619,7 +621,7 @@
             endif
 
         endif
-        timers(8) = MPI_Wtime() - timers(8)
+        t8 = MPI_Wtime() - t8
 
      endif     ! dnz .gt. 0
 
@@ -639,7 +641,7 @@
 	    call seg_copy_y(buf,buf1,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,buf1,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
 
-            timers(8) = MPI_Wtime()
+            t8 = MPI_Wtime()
 
 	    if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(buf1,iisize*jjsize, 1,buf1,iisize*jjsize, 1,nz,iisize*jjsize)
@@ -656,7 +658,7 @@
 		print *,'Unknown transform type: ',op(3:3)
 		call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
-            timers(8) = MPI_Wtime() - timers(8)
+            t8 = MPI_Wtime() - t8
 
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,1,nzhc,0,iisize,jjsize,nz)
 	   call seg_copy_z(buf1,XYZg,1,iisize,1,jjsize,nzhc+1,nzc,dnz,iisize,jjsize,nz)
@@ -666,7 +668,7 @@
 	    call seg_copy_y(buf,XYZg,1,nyhc,0,iisize,ny,nyc,nz)
 	    call seg_copy_y(buf,XYZg,nyhc+1,nyc,dny,iisize,ny,nyc,nz)
 
-	    timers(8) = MPI_Wtime()
+	    t8 = MPI_Wtime()
             if(op(3:3) == 't' .or. op(3:3) == 'f') then
                call init_f_c(XYZg,iisize*jjsize, 1, XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
                call exec_f_c2_same(XYZg,iisize*jjsize, 1,XYZg,iisize*jjsize, 1,nz,iisize*jjsize)
@@ -682,7 +684,7 @@
                 print *,'Unknown transform type: ',op(3:3)
                 call MPI_Abort(MPI_COMM_WORLD,ierr)
             endif
-            timers(8) = MPI_Wtime() - timers(8)
+            t8 = MPI_Wtime() - t8
 
 
         endif
@@ -695,9 +697,9 @@
       print *,taskid,': Waiting at barrier'
 #endif
 
-      call mpi_barrier(mpi_comm_world,ierr)
-
-      timers(2) = MPI_Wtime() - timers(2) - timers(8)  !Total time minus transform time
+      !call mpi_barrier(mpi_comm_world,ierr)
+      timers(8) = timers(8) + t8
+      timers(2) = timers(2) + MPI_Wtime() - t8  !Total time minus transform time
       return
       end subroutine
 
