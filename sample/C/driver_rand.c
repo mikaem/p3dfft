@@ -231,7 +231,7 @@ int main(int argc,char **argv)
     Cp3dfft_btran_c2r(B,C,op_b);
         /* normalize */
    for(k=0; k<Ntt; k++)
-       C[k] /= ((double) Ntt);
+       C[k] /= ((double) Nglob);
 //    mult_array(C,Ntot,factor);
     }
     tt[m] += MPI_Wtime();
